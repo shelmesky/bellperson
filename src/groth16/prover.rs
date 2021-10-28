@@ -250,7 +250,9 @@ where
     E: gpu::GpuEngine + MultiMillerLoop,
     C: Circuit<E::Fr> + Send,
 {
-    info!("Bellperson {} is being used!", BELLMAN_VERSION);
+    info!("Bellperson optmized {} is being used!", BELLMAN_VERSION);
+
+    let begin = Instant::now();
 
     let (start, mut provers, input_assignments, aux_assignments) =
         create_proof_batch_priority_inner(circuits)?;
@@ -522,7 +524,7 @@ where
         drop(prio_lock);
     }
 
-    let proof_time = start.elapsed();
+    let proof_time = begin.elapsed();
     info!("prover time: {:?}", proof_time);
 
     Ok(proofs)

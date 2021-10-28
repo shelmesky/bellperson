@@ -304,10 +304,12 @@ where
                     .zip(self.kernels.iter_mut())
                     .zip(results.iter_mut())
                 {
+                    let chunk_3090 = 67108864;
                     let error = error.clone();
                     s.execute(move || {
                         let mut acc = <G as PrimeCurveAffine>::Curve::identity();
-                        for (bases, exps) in bases.chunks(kern.n).zip(exps.chunks(kern.n)) {
+                        // for (bases, exps) in bases.chunks(kern.n).zip(exps.chunks(kern.n)) {
+                        for (bases, exps) in bases.chunks(chunk_3090).zip(exps.chunks(chunk_3090)) {
                             if error.read().unwrap().is_err() {
                                 break;
                             }
