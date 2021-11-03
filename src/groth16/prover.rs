@@ -351,13 +351,17 @@ where
 
         s.execute(move || {
             let h_s_cpu_start = Instant::now();
+            let cpu_a_s_1 = cpu_a_s.get(0).unwrap().clone();
+            let cpu_a_s_2 = cpu_a_s.get(1).unwrap().clone();
+            let cpu_a_s_3 = cpu_a_s.get(2).unwrap().clone();
             println!("ZQ h_s cpu start, length: {:?}", cpu_a_s.len());
+            println!("ZQ exps length: {:?}", cpu_a_s_1.len());
 
             h_s_tx_cpu.send(multiexp_only_cpu(
                 &worker,
                 params_cpu.clone(),
                 FullDensity,
-                cpu_a_s.get(0).unwrap().clone(),
+                cpu_a_s_1,
             )).unwrap();
 
             println!("ZQ h_s cpu round 1 elapsed: {:?}", h_s_cpu_start.elapsed());
@@ -366,7 +370,7 @@ where
                 &worker,
                 params_cpu.clone(),
                 FullDensity,
-                cpu_a_s.get(1).unwrap().clone(),
+                cpu_a_s_2,
             )).unwrap();
 
             println!("ZQ h_s cpu round 2 elapsed: {:?}", h_s_cpu_start.elapsed());
@@ -375,7 +379,7 @@ where
                 &worker,
                 params_cpu.clone(),
                 FullDensity,
-                cpu_a_s.get(2).unwrap().clone(),
+                cpu_a_s_3,
             )).unwrap();
 
             println!("ZQ h_s cpu round 3 elapsed: {:?}", h_s_cpu_start.elapsed());
