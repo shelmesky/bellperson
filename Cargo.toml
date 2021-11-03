@@ -85,7 +85,7 @@ maintenance = { status = "actively-developed" }
 name = "lc"
 harness = false
 
-[workspace]
-members = [
-  "verifier-bench"
-]
+#[workspace]
+#members = [
+#  "verifier-bench"
+#]

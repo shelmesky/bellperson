@@ -1,5 +1,6 @@
 use std::ops::{AddAssign, Mul, MulAssign};
 use std::sync::Arc;
+use std::sync::mpsc;
 use std::time::Instant;
 
 use ff::{Field, PrimeField};
@@ -12,7 +13,7 @@ use super::{ParameterSource, Proof};
 use crate::domain::EvaluationDomain;
 use crate::gpu::{self, LockedFFTKernel, LockedMultiexpKernel};
 use crate::multicore::{Worker, THREAD_POOL};
-use crate::multiexp::{multiexp, DensityTracker, FullDensity};
+use crate::multiexp::{multiexp, multiexp_only_cpu, DensityTracker, FullDensity};
 use crate::{
     Circuit, ConstraintSystem, Index, LinearCombination, SynthesisError, Variable, BELLMAN_VERSION,
 };
@@ -324,9 +325,11 @@ where
         Ok(())
     })?;
 
-    let mut multiexp_kern = Some(LockedMultiexpKernel::<E>::new(log_d, priority));
+    // let mut multiexp_kern = Some(LockedMultiexpKernel::<E>::new(log_d, priority));
     let params_h = params_h.unwrap()?;
 
+    let (h_s_tx_cpu, h_s_rx_cpu) = mpsc::channel();
+    let (h_s_tx_gpu, h_s_rx_gpu) = mpsc::channel();
     let mut h_s = Vec::with_capacity(num_circuits);
     let mut params_l = None;
 
@@ -337,17 +340,58 @@ where
             *params_l = Some(params.get_l(aux_assignment_len));
         });
 
+        let percent = 3;
+        let cpu_a_s = &a_s[0..percent];
+        let gpu_a_s = &a_s[percent..];
+        let params_cpu = params_h.clone();
+
         debug!("multiexp h");
-        for a in a_s.into_iter() {
-            h_s.push(multiexp(
+
+        s.execute(move || {
+            h_s_tx_cpu.send(multiexp_only_cpu(
                 &worker,
-                params_h.clone(),
+                params_cpu.clone(),
                 FullDensity,
-                a,
-                &mut multiexp_kern,
-            ));
-        }
+                cpu_a_s.get(0).unwrap().clone(),
+            )).unwrap();
+
+            h_s_tx_cpu.send(multiexp_only_cpu(
+                &worker,
+                params_cpu.clone(),
+                FullDensity,
+                cpu_a_s.get(1).unwrap().clone(),
+            )).unwrap();
+
+            h_s_tx_cpu.send(multiexp_only_cpu(
+                &worker,
+                params_cpu.clone(),
+                FullDensity,
+                cpu_a_s.get(2).unwrap().clone(),
+            )).unwrap();
+        });
+
+        s.execute(move || {
+            let mut multiexp_kern = Some(LockedMultiexpKernel::<E>::new(log_d, priority));
+            for a in gpu_a_s.into_iter() {
+                h_s_tx_gpu.send(multiexp(
+                    &worker,
+                    params_h.clone(),
+                    FullDensity,
+                    a.clone(),
+                    &mut multiexp_kern,
+                )).unwrap();
+            }
+            drop(multiexp_kern);
+        });
     });
+
+    for result in h_s_rx_cpu.recv() {
+        h_s.push(result);
+    }
+
+    for result in h_s_rx_gpu.recv() {
+        h_s.push(result);
+    }
 
     let params_l = params_l.unwrap()?;
 
@@ -370,6 +414,8 @@ where
             *params_b_g2 = Some(params.get_b_g2(b_input_density_total, b_aux_density_total));
         });
 
+        let mut multiexp_kern = Some(LockedMultiexpKernel::<E>::new(log_d, priority));
+
         debug!("multiexp l");
         for aux in aux_assignments.iter() {
             l_s.push(multiexp(
@@ -380,12 +426,16 @@ where
                 &mut multiexp_kern,
             ));
         }
+
+        drop(multiexp_kern);
     });
 
     debug!("get_a b_g1 b_g2");
     let (a_inputs_source, a_aux_source) = params_a.unwrap()?;
     let (b_g1_inputs_source, b_g1_aux_source) = params_b_g1.unwrap()?;
     let (b_g2_inputs_source, b_g2_aux_source) = params_b_g2.unwrap()?;
+
+    let mut multiexp_kern = Some(LockedMultiexpKernel::<E>::new(log_d, priority));
 
     debug!("multiexp a b_g1 b_g2");
     let inputs = provers
