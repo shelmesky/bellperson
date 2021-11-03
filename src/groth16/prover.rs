@@ -333,6 +333,8 @@ where
     let mut h_s = Vec::with_capacity(num_circuits);
     let mut params_l = None;
 
+    let h_s_start = Instant::now();
+
     THREAD_POOL.scoped(|s| {
         let params_l = &mut params_l;
         s.execute(move || {
@@ -348,12 +350,17 @@ where
         debug!("multiexp h");
 
         s.execute(move || {
+            let h_s_cpu_start = Instant::now();
+            println!("ZQ h_s cpu start");
+
             h_s_tx_cpu.send(multiexp_only_cpu(
                 &worker,
                 params_cpu.clone(),
                 FullDensity,
                 cpu_a_s.get(0).unwrap().clone(),
             )).unwrap();
+
+            println!("ZQ h_s cpu round 1 elapsed: {:?}", h_s_cpu_start.elapsed());
 
             h_s_tx_cpu.send(multiexp_only_cpu(
                 &worker,
@@ -362,16 +369,23 @@ where
                 cpu_a_s.get(1).unwrap().clone(),
             )).unwrap();
 
+            println!("ZQ h_s cpu round 2 elapsed: {:?}", h_s_cpu_start.elapsed());
+
             h_s_tx_cpu.send(multiexp_only_cpu(
                 &worker,
                 params_cpu.clone(),
                 FullDensity,
                 cpu_a_s.get(2).unwrap().clone(),
             )).unwrap();
+
+            println!("ZQ h_s cpu round 3 elapsed: {:?}", h_s_cpu_start.elapsed());
         });
 
         s.execute(move || {
             let mut multiexp_kern = Some(LockedMultiexpKernel::<E>::new(log_d, priority));
+            let h_s_cpu_start = Instant::now();
+            println!("ZQ h_s gpu start");
+
             for a in gpu_a_s.into_iter() {
                 h_s_tx_gpu.send(multiexp(
                     &worker,
@@ -381,6 +395,8 @@ where
                     &mut multiexp_kern,
                 )).unwrap();
             }
+
+            println!("ZQ h_s gpu elapsed: {:?}", h_s_cpu_start.elapsed());
             drop(multiexp_kern);
         });
     });
@@ -392,6 +408,8 @@ where
     for result in h_s_rx_gpu.recv() {
         h_s.push(result);
     }
+
+    println!("ZQ h_s elapsed: {:?}", h_s_start.elapsed());
 
     let params_l = params_l.unwrap()?;
 
