@@ -351,7 +351,7 @@ where
 
         s.execute(move || {
             let h_s_cpu_start = Instant::now();
-            println!("ZQ h_s cpu start");
+            println!("ZQ h_s cpu start, length: {:?}", cpu_a_s.len());
 
             h_s_tx_cpu.send(multiexp_only_cpu(
                 &worker,
@@ -384,7 +384,7 @@ where
         s.execute(move || {
             let mut multiexp_kern = Some(LockedMultiexpKernel::<E>::new(log_d, priority));
             let h_s_cpu_start = Instant::now();
-            println!("ZQ h_s gpu start");
+            println!("ZQ h_s gpu start, length: {:?}", gpu_a_s.len());
 
             for a in gpu_a_s.into_iter() {
                 h_s_tx_gpu.send(multiexp(
