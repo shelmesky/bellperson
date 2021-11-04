@@ -415,6 +415,8 @@ where
 
     println!("ZQ h_s elapsed: {:?}", h_s_start.elapsed());
 
+    println!("h_s[0]: {:?}", h_s[0].wait().unwrap());
+
     let params_l = params_l.unwrap()?;
 
     let mut l_s = Vec::with_capacity(num_circuits);
